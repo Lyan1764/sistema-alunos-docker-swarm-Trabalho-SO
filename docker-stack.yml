@@ -1,0 +1,131 @@
+# =============================================================================
+# Docker Swarm - execução em DOIS computadores (Nível 3 do trabalho)
+#
+#   Computador A (manager, label role=app): containers da APLICAÇÃO
+#   Computador B (worker,  label role=db) : containers do MongoDB (mongo1..3)
+#
+# A "mágica" está nas constraints de placement (deploy.placement.constraints):
+# o Swarm só agenda cada serviço no nó que possui a label indicada.
+#
+# Implantar (no manager):
+#   docker stack deploy -c docker-stack.yml --resolve-image never alunos
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------- MongoDB
+  mongo1:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo1_data:/data/db
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr                         # DNS devolve o IP do container direto
+      placement:
+        constraints: [node.labels.role == db]      # <- vai para o computador B
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  mongo2:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo2_data:/data/db
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints: [node.labels.role == db]
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  mongo3:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo3_data:/data/db
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+      placement:
+        constraints: [node.labels.role == db]
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  # Inicializa o replica set. No Swarm não existe "depends_on", então o próprio
+  # script espera os nós e, se falhar, o Swarm tenta de novo (on-failure).
+  # Depois de terminar com sucesso o serviço aparece como 0/1: é normal.
+  mongo-init:
+    image: mongo:7.0
+    entrypoint: ["sh", "/init-replica.sh"]
+    configs:
+      - source: init_replica
+        target: /init-replica.sh
+    networks: [rede-alunos]
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.role == db]
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 30
+
+  # ------------------------------------------------------------ Aplicação
+  app:
+    image: lyan1764/alunos-app:1.0
+    environment:
+      MONGO_URI: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+      MONGO_DB: escola
+    ports:
+      - target: 8000
+        published: 8000
+        protocol: tcp
+        mode: ingress                # a porta 8000 responde em QUALQUER nó do cluster
+    networks: [rede-alunos]
+    deploy:
+      replicas: 2                    # 2 containers da app: o Swarm balanceia as requisições
+      placement:
+        constraints: [node.labels.role == app]     # <- vai para o computador A
+      restart_policy:
+        condition: any
+        delay: 5s
+
+# ------------------------------------------------------------------ Infra
+configs:
+  init_replica:
+    file: ./mongo/init-replica.sh
+
+networks:
+  rede-alunos:
+    driver: overlay                  # rede virtual que atravessa os dois computadores
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:

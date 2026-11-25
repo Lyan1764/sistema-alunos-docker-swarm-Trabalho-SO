@@ -1,0 +1,99 @@
+# =============================================================================
+# Docker Compose - execução em UM computador (Níveis 1 e 2 do trabalho)
+#
+#   - app        : aplicação Python/Flask (imagem construída a partir de ./app)
+#   - mongo1..3  : MongoDB NoSQL distribuído em 3 containers (replica set "rs0")
+#   - mongo-init : container descartável que inicializa o replica set e termina
+#
+# Subir:   docker compose up -d --build
+# Acessar: http://localhost:8000
+# =============================================================================
+name: alunos
+
+services:
+
+  # ---------------------------------------------------------------- MongoDB
+  mongo1:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo1_data:/data/db        # volume nomeado: os dados sobrevivem ao container
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  mongo2:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo2_data:/data/db
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  mongo3:
+    image: mongo:7.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo3_data:/data/db
+    networks: [rede-alunos]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # Inicializa o replica set (roda uma vez e termina com código 0)
+  mongo-init:
+    image: mongo:7.0
+    entrypoint: ["sh", "/init-replica.sh"]
+    configs:
+      - source: init_replica
+        target: /init-replica.sh
+    depends_on:
+      mongo1: { condition: service_healthy }
+      mongo2: { condition: service_healthy }
+      mongo3: { condition: service_healthy }
+    networks: [rede-alunos]
+    restart: "no"
+
+  # ------------------------------------------------------------ Aplicação
+  app:
+    build: ./app                    # constrói a imagem usando app/Dockerfile
+    image: alunos-app:1.0
+    environment:
+      MONGO_URI: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+      MONGO_DB: escola
+    ports:
+      - "${APP_PORT:-8000}:8000"    # porta do computador : porta do container
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully   # só sobe depois do replica set pronto
+    networks: [rede-alunos]
+    restart: unless-stopped
+
+# ------------------------------------------------------------------ Infra
+configs:
+  init_replica:
+    file: ./mongo/init-replica.sh
+
+networks:
+  rede-alunos:
+    driver: bridge
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:

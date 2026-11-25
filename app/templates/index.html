@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastro de Alunos</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #ffffff; --ink: #1d2433; --muted: #66708a;
+    --line: #e2e6f0; --accent: #2563eb; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { background: #111a33; color: #fff; padding: 20px 24px; }
+  header h1 { margin: 0 0 4px; font-size: 1.4rem; }
+  header p { margin: 0; color: #aab4d4; font-size: .9rem; }
+  main { max-width: 1050px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card h2 { margin: 0 0 12px; font-size: 1rem; }
+  .nodes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .node { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: .85rem; min-width: 190px; }
+  .node b { display: block; font-size: .95rem; }
+  .node.PRIMARY { border-color: var(--ok); background: #f0fdf4; }
+  .node.SECONDARY { border-color: var(--accent); background: #eff6ff; }
+  .node.down { border-color: var(--bad); background: #fef2f2; }
+  .meta { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+  form { display: grid; grid-template-columns: 1.1fr 2fr 1.6fr .7fr 1.6fr auto; gap: 10px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: .78rem; color: var(--muted); }
+  input, select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); background: #fff; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  button.sec { background: #e8ecf8; color: var(--ink); }
+  button.danger { background: #fee2e2; color: var(--bad); padding: 4px 10px; }
+  button.small { padding: 4px 10px; font-size: .8rem; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: end; }
+  .toolbar label { flex: 1; min-width: 160px; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+  .tag { padding: 2px 8px; border-radius: 99px; font-size: .75rem; }
+  .tag.ok { background: #dcfce7; color: var(--ok); }
+  .tag.no { background: #fef3c7; color: var(--warn); }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: #eef2ff; border-radius: 99px; padding: 4px 12px; font-size: .82rem; }
+  #msg { min-height: 1.2em; font-size: .85rem; margin-top: 8px; }
+  #msg.erro { color: var(--bad); } #msg.ok { color: var(--ok); }
+  .vazio { color: var(--muted); padding: 14px 0; }
+  @media (max-width: 800px) { form { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎓 Cadastro de Alunos</h1>
+  <p>Python (Flask) + MongoDB em replica set — Docker Compose / Docker Swarm</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Cluster MongoDB (replica set)</h2>
+    <div class="nodes" id="nodes"><span class="vazio">Consultando o cluster…</span></div>
+    <div class="meta" id="infoApp"></div>
+  </section>
+
+  <section class="card">
+    <h2>Matricular aluno</h2>
+    <form id="formAluno">
+      <label>Matrícula <input name="matricula" required pattern="\d{5,15}" title="5 a 15 dígitos" inputmode="numeric"></label>
+      <label>Nome <input name="nome" required maxlength="120"></label>
+      <label>Curso <input name="curso" list="cursos" required maxlength="80"></label>
+      <label>Período <input name="periodo" type="number" min="1" max="20" required></label>
+      <label>E-mail <input name="email" type="email" maxlength="120"></label>
+      <datalist id="cursos"></datalist>
+      <button type="submit">Matricular</button>
+    </form>
+    <div id="msg"></div>
+  </section>
+
+  <section class="card">
+    <h2>Consultar alunos</h2>
+    <div class="toolbar">
+      <label>Buscar por nome ou matrícula <input id="busca" placeholder="ex.: ana ou 20240001"></label>
+      <label>Curso <select id="filtroCurso"><option value="">Todos</option></select></label>
+      <label>Situação <select id="filtroStatus"><option value="">Todas</option><option>Ativo</option><option>Trancado</option><option>Formado</option></select></label>
+      <button class="sec" id="btnExemplos" type="button">Carregar exemplos</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <table>
+      <thead><tr><th>Matrícula</th><th>Nome</th><th>Curso</th><th>Per.</th><th>E-mail</th><th>Situação</th><th></th></tr></thead>
+      <tbody id="lista"></tbody>
+    </table>
+    <div class="meta" id="infoLeitura"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function api(url, opcoes) {
+  const r = await fetch(url, opcoes);
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(dados.erro || ("Erro " + r.status));
+  return dados;
+}
+const JSONH = {"Content-Type": "application/json"};
+
+function mensagem(texto, tipo) { const m = $("msg"); m.textContent = texto; m.className = tipo || ""; }
+function celula(tr, texto) { const td = document.createElement("td"); td.textContent = texto; tr.appendChild(td); return td; }
+
+/* ---------- Status do cluster ---------- */
+async function carregarStatus() {
+  const box = $("nodes");
+  try {
+    const s = await api("/api/status");
+    box.replaceChildren();
+    s.membros.forEach((m) => {
+      const d = document.createElement("div");
+      d.className = "node " + (m.saudavel ? m.estado : "down");
+      const b = document.createElement("b"); b.textContent = m.nome; d.appendChild(b);
+      d.appendChild(document.createTextNode(m.saudavel ? m.estado : "INACESSÍVEL (" + m.estado + ")"));
+      box.appendChild(d);
+    });
+    $("infoApp").textContent = "Replica set: " + s.replica_set + " • resposta enviada pelo container da aplicação: " + s.container;
+  } catch (e) {
+    box.replaceChildren();
+    const d = document.createElement("div"); d.className = "node down";
+    d.textContent = "Cluster indisponível: " + e.message; box.appendChild(d);
+  }
+}
+
+/* ---------- Lista de alunos ---------- */
+async function carregarAlunos() {
+  const params = new URLSearchParams();
+  if ($("busca").value.trim()) params.set("busca", $("busca").value.trim());
+  if ($("filtroCurso").value) params.set("curso", $("filtroCurso").value);
+  if ($("filtroStatus").value) params.set("status", $("filtroStatus").value);
+  const corpo = $("lista");
+  try {
+    const d = await api("/api/alunos?" + params.toString());
+    corpo.replaceChildren();
+    if (d.alunos.length === 0) {
+      const tr = document.createElement("tr");
+      const td = celula(tr, "Nenhum aluno encontrado. Matricule um ou clique em “Carregar exemplos”.");
+      td.colSpan = 7; td.className = "vazio"; corpo.appendChild(tr);
+    }
+    d.alunos.forEach((a) => {
+      const tr = document.createElement("tr");
+      celula(tr, a.matricula); celula(tr, a.nome); celula(tr, a.curso); celula(tr, a.periodo); celula(tr, a.email || "—");
+      const tdSit = document.createElement("td");
+      const tag = document.createElement("span");
+      tag.className = "tag " + (a.status === "Ativo" ? "ok" : "no"); tag.textContent = a.status;
+      tdSit.appendChild(tag); tr.appendChild(tdSit);
+
+      const tdAc = document.createElement("td");
+      const bSt = document.createElement("button");
+      bSt.className = "sec small";
+      bSt.textContent = a.status === "Ativo" ? "Trancar" : "Reativar";
+      bSt.onclick = async () => {
+        try { await api("/api/alunos/" + a.matricula, {method: "PATCH", headers: JSONH,
+              body: JSON.stringify({status: a.status === "Ativo" ? "Trancado" : "Ativo"})}); carregarTudo(); }
+        catch (e) { mensagem(e.message, "erro"); }
+      };
+      const bPer = document.createElement("button");
+      bPer.className = "sec small"; bPer.textContent = "Período"; bPer.style.marginLeft = "6px";
+      bPer.onclick = async () => {
+        const novo = prompt("Novo período para " + a.nome + ":", a.periodo);
+        if (novo === null) return;
+        try { await api("/api/alunos/" + a.matricula, {method: "PATCH", headers: JSONH, body: JSON.stringify({periodo: novo})}); carregarTudo(); }
+        catch (e) { mensagem(e.message, "erro"); }
+      };
+      const bDel = document.createElement("button");
+      bDel.className = "danger small"; bDel.textContent = "Excluir"; bDel.style.marginLeft = "6px";
+      bDel.onclick = async () => {
+        if (!confirm("Excluir a matrícula " + a.matricula + " (" + a.nome + ")?")) return;
+        try { await api("/api/alunos/" + a.matricula, {method: "DELETE"}); carregarTudo(); }
+        catch (e) { mensagem(e.message, "erro"); }
+      };
+      tdAc.append(bSt, bPer, bDel); tr.appendChild(tdAc);
+      corpo.appendChild(tr);
+    });
+    $("infoLeitura").textContent = d.total + " aluno(s) • consulta atendida pelo nó " + (d.lido_de || "—") +
+                                   " • container da aplicação: " + d.container;
+  } catch (e) {
+    corpo.replaceChildren();
+    const tr = document.createElement("tr");
+    const td = celula(tr, e.message); td.colSpan = 7; td.className = "vazio"; corpo.appendChild(tr);
+  }
+}
+
+/* ---------- Estatísticas (aggregation) e filtro de cursos ---------- */
+async function carregarEstatisticas() {
+  try {
+    const d = await api("/api/estatisticas");
+    const box = $("stats"); box.replaceChildren();
+    const total = document.createElement("span"); total.className = "chip"; total.textContent = "Total: " + d.total_alunos;
+    box.appendChild(total);
+    const sel = $("filtroCurso"), atual = sel.value;
+    sel.replaceChildren(new Option("Todos", ""));
+    $("cursos").replaceChildren();
+    d.por_curso.forEach((c) => {
+      const chip = document.createElement("span"); chip.className = "chip";
+      chip.textContent = c.curso + ": " + c.total + " (" + c.ativos + " ativos, período médio " + c.media_periodo + ")";
+      box.appendChild(chip);
+      sel.appendChild(new Option(c.curso, c.curso));
+      const o = document.createElement("option"); o.value = c.curso; $("cursos").appendChild(o);
+    });
+    sel.value = atual;
+  } catch (e) { /* o erro já aparece na lista */ }
+}
+
+function carregarTudo() { carregarAlunos(); carregarEstatisticas(); carregarStatus(); }
+
+/* ---------- Eventos ---------- */
+$("formAluno").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const f = ev.target;
+  const corpo = {matricula: f.matricula.value, nome: f.nome.value, curso: f.curso.value, periodo: f.periodo.value, email: f.email.value};
+  try {
+    const r = await api("/api/alunos", {method: "POST", headers: JSONH, body: JSON.stringify(corpo)});
+    mensagem("Aluno gravado no nó PRIMARY " + r.gravado_em + " (confirmado pela maioria do replica set).", "ok");
+    f.reset(); carregarTudo();
+  } catch (e) { mensagem(e.message, "erro"); }
+});
+$("busca").addEventListener("input", () => { clearTimeout(window._t); window._t = setTimeout(carregarAlunos, 300); });
+$("filtroCurso").addEventListener("change", carregarAlunos);
+$("filtroStatus").addEventListener("change", carregarAlunos);
+$("btnExemplos").addEventListener("click", async () => {
+  try { const r = await api("/api/exemplos", {method: "POST"}); mensagem(r.inseridos + " aluno(s) de exemplo adicionados.", "ok"); carregarTudo(); }
+  catch (e) { mensagem(e.message, "erro"); }
+});
+
+carregarTudo();
+setInterval(carregarStatus, 5000);
+</script>
+</body>
+</html>
