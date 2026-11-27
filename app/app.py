@@ -1,7 +1,5 @@
 """
 Cadastro de Alunos Distribuído
-==============================
-Trabalho Final de Sistemas Operacionais (UFPI - Picos) - Docker.
 
 Aplicação web simples (Python + Flask) que cadastra, consulta, altera e exclui alunos (por matrícula) em um
 banco NoSQL (MongoDB) executando como *replica set* de 3 containers.
@@ -33,9 +31,7 @@ MONGO_URI = os.getenv(
 )
 DB_NAME = os.getenv("MONGO_DB", "escola")
 
-# - w="majority": a escrita só é confirmada quando a maioria dos nós (2 de 3) a gravou.
-# - primaryPreferred: lê do primário; se ele cair, lê de um secundário (a app não "morre").
-# - serverSelectionTimeoutMS: tempo máximo esperando algum nó ficar disponível.
+
 client = MongoClient(
     MONGO_URI,
     w="majority",
@@ -72,7 +68,7 @@ HOSTNAME = socket.gethostname()  # id do container (mostra o balanceamento no Sw
 def serializar(doc):
     """Converte um documento do MongoDB em algo que o jsonify entende."""
     doc = dict(doc)
-    doc.pop("_id", None)  # a chave pública do aluno é a matrícula
+    doc.pop("_id", None)  # a chave e a aluno
     if isinstance(doc.get("criado_em"), datetime):
         doc["criado_em"] = doc["criado_em"].isoformat()
     return doc
